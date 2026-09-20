@@ -1,0 +1,49 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>lx-inventory preview</title>
+<style>html,body{margin:0;height:100%;background:#1a1d1a url('bg.jpg') center/cover}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
+.bar{position:fixed;top:8px;left:8px;z-index:5;display:flex;gap:6px}.bar button{font:12px monospace;padding:6px 10px;background:#111;color:#eee;border:1px solid #444;cursor:pointer}</style></head>
+<body><div class="bar"><button data-do="single">open single</button><button data-do="stash">open + stash</button><button data-do="shop">open + shop</button><button data-do="hotbar">hotbar</button><button data-do="box">item box</button><button data-do="req">required</button><button data-do="close">close</button></div>
+<iframe id="f" src="../html/index.html"></iframe>
+<script>
+const items=(n)=>{const names=['bandage','beer','coffee','lockpick','weapon_pistol','phone','water_bottle','sandwich','armor','bank_card','copper','diamond_ring'];const out=[];for(let i=1;i<=n;i++){const nm=names[(i-1)%names.length];out.push({name:nm,label:nm.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),image:nm+'.png',slot:i,amount:nm.startsWith('weapon')?1:(i*3)%17+1,weight:nm.startsWith('weapon')?1000:100*((i%4)+1),unique:nm.startsWith('weapon'),useable:true,description:'A '+nm+' from the preview set.',info:nm.startsWith('weapon')?{serie:'LXR'+i+'X9',quality:72-i*5,attachments:{}}:(i%3===0?{quality:100-i*7}:{})});}return out;};
+const f=document.getElementById('f');const send=m=>f.contentWindow.postMessage(m,'*');
+const base={action:'open',slots:41,maxweight:120000,inventory:items(9)};
+document.querySelector('.bar').addEventListener('click',e=>{const d=e.target.dataset.do;if(!d)return;
+ if(d==='single')send(base);
+ if(d==='stash')send({...base,other:{name:'trunk-1ABC234',label:'Trunk · 1ABC234',maxweight:400000,slots:30,inventory:items(4).map(i=>({...i,slot:i.slot+2}))}});
+ if(d==='shop')send({...base,other:{name:'shop-247',label:'24/7 Supermarket',maxweight:1000000,slots:20,inventory:items(6).map(i=>({...i,price:(i.slot*4)+1,amount:50}))}});
+ if(d==='hotbar')send({action:'toggleHotbar',open:true,items:items(5)});
+ if(d==='box')send({action:'itemBox',item:{label:'Bandage',image:'bandage.png'},type:['add','remove','use'][Math.floor(Math.random()*3)],amount:3});
+ if(d==='req')send({action:'requiredItem',toggle:true,items:[{label:'Lockpick',image:'lockpick.png'},{label:'Drill',image:'drill.png'}]});
+ if(d==='close')send({action:'close'});
+});
+
+const mode=new URLSearchParams(location.search).get('mode');
+if(mode){f.addEventListener('load',()=>setTimeout(()=>{
+ if(mode==='single'){send(base);}
+ if(mode==='stash'){send({...base,other:{name:'trunk-1ABC234',label:'Trunk · 1ABC234',maxweight:400000,slots:30,inventory:items(4).map(i=>({...i,slot:i.slot+2}))}});}
+ if(mode==='shop'){send({...base,other:{name:'shop-247',label:'24/7 Supermarket',maxweight:1000000,slots:20,inventory:items(6).map(i=>({...i,price:(i.slot*4)+1,amount:50}))}});}
+ if(mode==='hud'){send({action:'toggleHotbar',open:true,items:items(5)});send({action:'itemBox',item:{label:'Bandage',image:'bandage.png'},type:'add',amount:3});send({action:'requiredItem',toggle:true,items:[{label:'Lockpick',image:'lockpick.png'},{label:'Drill',image:'drill.png'}]});}
+ if(mode==='ctx'){send({...base,other:{name:'trunk-1ABC234',label:'Trunk · 1ABC234',maxweight:400000,slots:30,inventory:items(4).map(i=>({...i,slot:i.slot+2}))}});setTimeout(()=>{const d=f.contentWindow.document;const n=d.querySelectorAll('#player-fast .slot.has')[3];const r=n.getBoundingClientRect();n.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:2,clientX:r.left+40,clientY:r.top+40}));},300);}
+if(mode==='tip'){send(base);setTimeout(()=>{const d=f.contentWindow.document;const n2=d.querySelectorAll('#player-fast .slot.has')[4];const r2=n2.getBoundingClientRect();n2.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,clientX:r2.left+40,clientY:r2.top+40}));},300);}
+},300));}
+
+if(mode==='test'){f.addEventListener('load',()=>setTimeout(async()=>{const R={};try{
+ const w=f.contentWindow,d=w.document;w.__calls=[];w.fetch=(u,o)=>{w.__calls.push({u:u.replace(/https:\/\/[^/]+\//,''),b:JSON.parse(o.body)});return Promise.resolve({json:()=>Promise.resolve(u.includes('AttemptPurchase')||u.includes('GiveItem')?true:u.includes('DropItem')?'drop-123':{})});};
+ send({...base,other:{name:'trunk-1ABC234',label:'Trunk · 1ABC234',maxweight:400000,slots:30,inventory:items(4).map(i=>({...i,slot:i.slot+2}))}});await new Promise(r=>setTimeout(r,200));
+ const S=w.LXInv.state;const ev=(el,type,btn,x,y,extra={})=>el.dispatchEvent(new w.MouseEvent(type,{bubbles:true,button:btn,clientX:x,clientY:y,...extra}));
+ const slot=(g,n)=>d.querySelector(`#${g} [data-slot="${n}"]`);const rc=el=>{const r=el.getBoundingClientRect();return [r.left+40,r.top+40]};
+ const drag=(g1,n1,g2,n2)=>{let [x,y]=rc(slot(g1,n1));ev(slot(g1,n1),'mousedown',0,x,y);let [tx,ty]=rc(slot(g2,n2));ev(w,'mousemove',0,tx,ty);ev(w,'mouseup',0,tx,ty);};
+ w.addEventListener('error',e=>R.err=(R.err||'')+e.message+'@'+e.lineno+' ');
+ S.amount=2;drag('player-fast',1,'other-grid',1);R.partial={p1:S.player[1].amount,o1:S.other[1]&&S.other[1].amount};
+ S.amount=null;drag('other-grid',4,'player-fast',2);R.stack={p2:S.player[2].amount,o4:!!S.other[4]};
+ drag('player-fast',5,'player-fast',3);R.swap={p3:S.player[3].name,p5:S.player[5].name};
+ S.amount=1;let [x,y]=rc(slot('other-grid',5));ev(slot('other-grid',5),'mousedown',2,x,y);R.quick={o5:S.other[5]&&S.other[5].amount,coffeeSlots:Object.values(S.player).filter(i=>i.name==='coffee').map(i=>i.slot+':'+i.amount)};
+ S.amount=null;[x,y]=rc(slot('player-fast',4));ev(slot('player-fast',4),'mousedown',0,x,y,{shiftKey:true});R.split=Object.values(S.player).filter(i=>i.name==='lockpick').map(i=>i.slot+':'+i.amount);R.quick2=S.other[6]&&S.other[6].amount;
+ send({action:'close'});await new Promise(r=>setTimeout(r,50));send(base);await new Promise(r=>setTimeout(r,200));[x,y]=rc(slot('player-fast',4));ev(slot('player-fast',4),'mousedown',0,x,y,{shiftKey:true});R.splitSingle=Object.values(S.player).filter(i=>i.name==='lockpick').map(i=>i.slot+':'+i.amount);send({action:'close'});await new Promise(r=>setTimeout(r,50));
+ send({...base,other:{name:'shop-247',label:'24/7 Supermarket',maxweight:1000000,slots:20,inventory:items(6).map(i=>({...i,price:(i.slot*4)+1,amount:50}))}});await new Promise(r=>setTimeout(r,200));
+ S.amount=3;drag('other-grid',2,'player-grid',12);await new Promise(r=>setTimeout(r,50));R.buy={p12:S.player[12]&&S.player[12].name+':'+S.player[12].amount,shop2:S.other[2].amount};
+ send({action:'close'});await new Promise(r=>setTimeout(r,50));send(base);await new Promise(r=>setTimeout(r,200));
+ [x,y]=rc(slot('player-fast',1));ev(slot('player-fast',1),'mousedown',2,x,y);R.ctx=!d.getElementById('modal').classList.contains('hidden');d.getElementById('m-num').value=2;d.getElementById('m-num').dispatchEvent(new w.Event('input'));d.querySelector('#m-actions [data-act="drop"]').click();await new Promise(r=>setTimeout(r,50));R.drop={p1:S.player[1]&&S.player[1].amount,other:S.otherName,o1:S.other[1]&&S.other[1].amount};
+ R.calls=w.__calls;}catch(e){R.fatal=String(e&&e.stack||e);}const pre=document.createElement('pre');pre.id='result';pre.textContent=JSON.stringify(R);document.body.appendChild(pre);document.title='TESTDONE';
+},400));}
+</script></body></html>

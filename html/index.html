@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LX Inventory</title>
+    <!--
+        lx-inventory NUI — the LXR UI kit (lxr-ui.css) on top of the qb-inventory client contract.
+        No CDN, no framework: fonts ship in html/fonts, everything renders with the game offline.
+        Messages in:  open · close · update · toggleHotbar · itemBox · requiredItem
+        Callbacks out: CloseInventory · SetInventoryData · UseItem · DropItem · GiveItem · AttemptPurchase ·
+                       PlayDropFail · GetWeaponData · RemoveAttachment   (identical payloads to qb-inventory 2.x)
+    -->
+    <link rel="stylesheet" href="lxr-ui.css" />
+    <link rel="stylesheet" href="main.css" />
+</head>
+<body class="lxr">
+    <div id="inventory" class="inv hidden">
+        <!-- top bar: label chip · esc -->
+        <div class="topbar">
+            <div class="chip"><span class="dot"></span><span id="player-chip">Inventory</span></div>
+            <div class="topbar-right lxr-mono">ESC to close <span class="lxr-key">ESC</span></div>
+        </div>
+
+        <!-- ═══════════════ LEFT: player ═══════════════ -->
+        <section class="side side-left" id="panel-player" data-inv="player">
+            <div class="wordmark">INVENTORY</div>
+            <div class="wordmark-sub">Inventory</div>
+            <div class="hints">
+                <span class="hint"><i class="mouse r"></i>Leave / take / use</span>
+                <span class="hint"><i class="mouse l"></i>Double click to use quick</span>
+                <span class="hint"><i class="mouse l"></i><i class="mouse shift"></i>Move fast</span>
+            </div>
+
+            <header class="sec">
+                <div class="sec-row"><span class="dot"></span><span class="sec-title" id="player-label">Your inventory</span><span class="sec-weight lxr-mono" id="player-weight"><b>0.0</b> / 0.0 Kg</span></div>
+                <div class="sec-bar"><i id="player-meter"></i></div>
+            </header>
+
+            <div class="grid fast" id="player-fast"></div>
+
+            <div class="toolbar">
+                <label class="amount"><input id="amount" type="number" min="1" placeholder="1" inputmode="numeric" /><span class="stepper"><button data-step="1" type="button">▴</button><button data-step="-1" type="button">▾</button></span></label>
+                <label class="search"><input id="search" type="text" placeholder="Search item" /><i class="ico-search"></i></label>
+                <div class="filters" id="filters">
+                    <button class="on" data-f="all" type="button">All</button>
+                    <button data-f="weapon" title="weapons" type="button">⌐</button>
+                    <button data-f="use" title="usable" type="button">◉</button>
+                    <button data-f="other" title="other" type="button">▦</button>
+                </div>
+            </div>
+
+            <div class="grid-wrap"><div class="grid main" id="player-grid"></div><div class="accent-bar"></div></div>
+        </section>
+
+        <!-- ═══════════════ RIGHT: other ═══════════════ -->
+        <section class="side side-right hidden" id="panel-other" data-inv="other">
+            <header class="sec">
+                <div class="sec-row"><span class="dot"></span><span class="sec-title" id="other-label">Drop</span><span class="sec-weight lxr-mono" id="other-weight"><b>0.0</b> / 0.0 Kg</span></div>
+                <div class="sec-bar"><i id="other-meter"></i></div>
+            </header>
+            <div class="grid-wrap"><div class="grid main" id="other-grid"></div></div>
+        </section>
+
+        <!-- tooltip -->
+        <div id="tip" class="tip hidden"></div>
+
+        <!-- action modal (centered) -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-card">
+                <div class="modal-head"><span class="modal-name" id="m-name"></span><span class="modal-weight lxr-mono" id="m-weight"></span></div>
+                <div class="modal-desc" id="m-desc"></div>
+                <div class="modal-amount"><input type="range" id="m-range" min="1" max="1" value="1" /><input type="number" id="m-num" min="1" value="1" /></div>
+                <div class="modal-actions" id="m-actions">
+                    <button data-act="fast" id="m-fast" type="button">Add to fastslot</button>
+                    <button data-act="use" id="m-use" type="button">Use</button>
+                    <button data-act="put" id="m-put" type="button">Put</button>
+                    <button data-act="give" type="button">Give item to player nearby</button>
+                    <button data-act="drop" type="button">Throw</button>
+                    <button data-act="split" id="m-split" type="button">Split</button>
+                    <button data-act="serial" id="m-serial" type="button">Copy serial</button>
+                    <button data-act="attach" id="m-attach" type="button">Attachments</button>
+                    <button data-act="cancel" class="cancel" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- weapon attachments -->
+        <section id="attachments" class="attach hidden">
+            <header class="sec-row"><span class="dot"></span><span class="sec-title" id="attach-title">Attachments</span><button class="x" id="attach-close" type="button">×</button></header>
+            <div class="attach-weapon"><img id="attach-weapon-img" alt="" /></div>
+            <div class="grid" id="attach-list"></div>
+            <p class="lxr-mono attach-hint">click an attachment to take it off</p>
+        </section>
+    </div>
+
+    <!-- ═══════════════ HUD LAYER ═══════════════ -->
+    <div id="hotbar" class="hotbar hidden"></div>
+    <div id="itembox" class="itembox hidden"><span class="dot"></span><span id="itembox-kind" class="lxr-mono">Received</span><img id="itembox-img" alt="" /><span id="itembox-label"></span><span id="itembox-amount" class="lxr-mono"></span></div>
+    <div id="required" class="required hidden"></div>
+
+    <script src="app.js" defer></script>
+</body>
+</html>

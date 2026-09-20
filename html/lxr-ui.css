@@ -1,0 +1,1011 @@
+/* ==========================================================================
+   LXR UI — NUI kit
+   Extracted from genatsvale.shop ("The Reel") for use across lxr-* resources.
+
+   Version 1.0.0
+
+   WHY THIS IS NOT A COPY OF THE WEBSITE'S CSS
+   ------------------------------------------------------------------------
+   The site is built with Tailwind v4 and modern CSS that a browser from 2024
+   onward handles fine. RedM and FiveM render NUI in an embedded CEF build
+   that lags mainline Chromium, and four things the site relies on will fail
+   there — silently, which is worse than loudly:
+
+     color-mix()          Chrome 111+   -> precomputed rgba() below
+     oklab / oklch        Chrome 111+   -> not used at all
+     CSS nesting (&:hover) Chrome 112+  -> every rule flattened
+     @import from a CDN   needs internet -> fonts are local, see FONTS
+
+   Everything here is plain CSS that works back to roughly Chrome 90. No
+   build step, no preprocessor, no framework. Drop it in and link it.
+
+   FONTS
+   ------------------------------------------------------------------------
+   NUI usually has no outbound internet, and a server that does is still a
+   server whose players wait on Google's CDN. Ship the files inside the
+   resource:
+
+     lxr-yourscript/
+       html/
+         index.html
+         lxr-ui.css
+         fonts/
+           Fraunces.woff2          (variable, opsz+SOFT+WONK)
+           Inter.woff2             (variable)
+           JetBrainsMono.woff2     (variable)
+           NotoSansGeorgian.woff2  (variable, only if you print Georgian)
+
+   and in fxmanifest.lua:
+
+     files {
+       'html/index.html',
+       'html/lxr-ui.css',
+       'html/fonts/*.woff2',
+     }
+     ui_page 'html/index.html'
+
+   If a face is missing the stack falls back to a system serif/sans/mono, so
+   a forgotten file degrades instead of breaking.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   FONTS — local only. Delete a block if you are not shipping that face.
+   -------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'LXR Cut';
+  src: url('fonts/Fraunces.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: block; /* block, not swap: a HUD that reflows mid-read is worse than one that appears 100ms later */
+}
+
+@font-face {
+  font-family: 'LXR Plain';
+  src: url('fonts/Inter.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'LXR Code';
+  src: url('fonts/JetBrainsMono.woff2') format('woff2-variations');
+  font-weight: 100 800;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'LXR Ka';
+  src: url('fonts/NotoSansGeorgian.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: block;
+}
+
+/* ==========================================================================
+   1. TOKENS
+   ========================================================================== */
+
+:root {
+  /* --- Ink ---------------------------------------------------------------
+     Five steps from near-black to near-white. There is no pure #000 and no
+     pure #fff anywhere: pure black kills the sense of depth over a rendered
+     game frame, and pure white glares. */
+  --lxr-void: #050506; /* page ground, deepest panel */
+  --lxr-pit: #0e0e11; /* raised surface, card, input well */
+  --lxr-edge: #1e1e23; /* hairline borders, dividers */
+  --lxr-smoke: #58575e; /* meta text, disabled, decorative only — see CONTRAST */
+  --lxr-ash: #9b9aa0; /* body copy, secondary text */
+  --lxr-bone: #f4f2ee; /* primary text, primary button fill */
+
+  /* --- Accent ------------------------------------------------------------
+     ONE accent, wine red, in two steps. This is a hard brand rule: no gold,
+     no bronze, no brown, no second hue. If something needs to stand out and
+     red is already used nearby, change its weight or its size — not its hue. */
+  --lxr-blood: #8d1226; /* deep — fills, glows, backgrounds */
+  --lxr-blood-lit: #c21c37; /* lit — hover, active, focus, alerts */
+
+  /* --- Alpha ramps -------------------------------------------------------
+     Precomputed. On the website these are color-mix() calls, which CEF may
+     not parse; mixing any colour with `transparent` is just an alpha scale,
+     so these values are exact, not approximations. */
+  --lxr-bone-07: rgba(244, 242, 238, 0.07); /* ghost button hover fill */
+  --lxr-bone-26: rgba(244, 242, 238, 0.26); /* ghost button border */
+  --lxr-bone-40: rgba(244, 242, 238, 0.4);
+  --lxr-bone-65: rgba(244, 242, 238, 0.65);
+  --lxr-blood-18: rgba(194, 28, 55, 0.18); /* soft glow */
+  --lxr-blood-34: rgba(141, 18, 38, 0.34); /* stage wash */
+
+  /* --- State -------------------------------------------------------------
+     Derived from the accent so the palette stays single-hue. Green and amber
+     appear ONLY as status semantics — never as decoration, never as an
+     accent, never in a button that is not communicating a state. */
+  --lxr-ok: #3f9a6b;
+  --lxr-warn: #b8862f;
+  --lxr-bad: var(--lxr-blood-lit);
+
+  /* --- Type ---------------------------------------------------------------
+     Four faces, four jobs, no overlap. Every fallback is a system face that
+     exists on Windows, because that is what a RedM client runs. */
+  --lxr-font-cut: 'LXR Cut', 'Fraunces', Georgia, 'Times New Roman', serif;
+  --lxr-font-plain: 'LXR Plain', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --lxr-font-code: 'LXR Code', 'JetBrains Mono', Consolas, ui-monospace, monospace;
+  --lxr-font-ka: 'LXR Ka', 'Noto Sans Georgian', Sylfaen, sans-serif;
+
+  /* --- Scale --------------------------------------------------------------
+     Fixed px, not rem. NUI has no user font-size preference to respect and a
+     rem scale invites a stray html{font-size} in one script to resize the
+     HUD of another. */
+  --lxr-text-micro: 11px; /* the mono label — the workhorse */
+  --lxr-text-sm: 13px;
+  --lxr-text-body: 14px;
+  --lxr-text-lg: 17px;
+  --lxr-text-xl: 22px;
+  --lxr-title: 34px;
+  --lxr-title-lg: 52px;
+
+  --lxr-track-mono: 0.18em; /* the signature: wide-tracked uppercase mono */
+  --lxr-track-cut: -0.018em; /* the serif tightens as it grows */
+
+  /* --- Space --------------------------------------------------------------
+     4px base. Every gap in this kit is a multiple. */
+  --lxr-s1: 4px;
+  --lxr-s2: 8px;
+  --lxr-s3: 12px;
+  --lxr-s4: 16px;
+  --lxr-s5: 24px;
+  --lxr-s6: 32px;
+  --lxr-s7: 48px;
+  --lxr-s8: 64px;
+
+  /* --- Geometry -----------------------------------------------------------
+     Square by default. The brand is editorial, not app-like — a 12px radius
+     on everything is the single fastest way to make this look generic. Only
+     floating pills round. */
+  --lxr-radius: 0;
+  --lxr-radius-pill: 999px;
+  --lxr-hairline: 1px;
+
+  /* --- Motion -------------------------------------------------------------
+     Two curves. `ease` decelerates for things arriving; `cut` is fast-in
+     fast-out for things being replaced. */
+  --lxr-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --lxr-cut: cubic-bezier(0.7, 0, 0.16, 1);
+  --lxr-fast: 180ms;
+  --lxr-mid: 320ms;
+  --lxr-slow: 450ms;
+
+  /* --- Elevation ----------------------------------------------------------
+     One shadow, used sparingly. Over a game frame a heavy shadow reads as
+     mud, not depth. */
+  --lxr-lift: 0 24px 70px -12px rgba(0, 0, 0, 0.9);
+
+  /* --- Panel ground -------------------------------------------------------
+     What a floating panel sits on over the game frame. */
+  --lxr-panel-bg: linear-gradient(90deg, rgba(5, 5, 6, 0.85), rgba(5, 5, 6, 0.6));
+  --lxr-panel-solid: rgba(5, 5, 6, 0.75);
+}
+
+/* ==========================================================================
+   THEMES — one stylesheet, two tempers. Set by the client from
+   LXRCore.Brand.theme (lxr-core Config.UI.theme) as <html data-theme="…">.
+
+   LXR Night (default)  the kit as designed: void and pit inks, blood accent,
+                        radius 0, Fraunces for titles.
+   LXR Morning          the neutral-grey temper: #252525 ground, #343434
+                        cards, soft white hairlines, 10 px radius, Inter for
+                        titles too. Same accent, same components.
+   ========================================================================== */
+:root[data-theme='morning'],
+:root[data-theme='morning'] .lxr {
+  --lxr-void: #1c1c1c;
+  --lxr-pit: #252525;
+  --lxr-edge: rgba(255, 255, 255, 0.1);
+  --lxr-smoke: #8e8e8e;
+  --lxr-ash: #b5b5b5;
+  --lxr-bone: #fbfbfb;
+  --lxr-bone-07: rgba(251, 251, 251, 0.06);
+  --lxr-bone-26: rgba(251, 251, 251, 0.22);
+  --lxr-bone-40: rgba(251, 251, 251, 0.4);
+  --lxr-bone-65: rgba(251, 251, 251, 0.65);
+  --lxr-font-cut: 'LXR Plain', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --lxr-track-cut: -0.01em;
+  --lxr-radius: 10px;
+  --lxr-lift: 0 12px 40px -10px rgba(0, 0, 0, 0.7);
+  --lxr-panel-bg: rgba(37, 37, 37, 0.92);
+  --lxr-panel-solid: rgba(52, 52, 52, 0.95);
+}
+:root[data-theme='morning'] .lxr .lxr-cut,
+:root[data-theme='morning'] .lxr h1,
+:root[data-theme='morning'] .lxr h2 { font-weight: 700; }
+
+/* ==========================================================================
+   2. RESET
+   Scoped to .lxr so this file can sit alongside another script's CSS
+   without fighting it.
+   ========================================================================== */
+
+.lxr,
+.lxr *,
+.lxr *::before,
+.lxr *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.lxr {
+  font-family: var(--lxr-font-plain);
+  font-size: var(--lxr-text-body);
+  line-height: 1.5;
+  color: var(--lxr-bone);
+  -webkit-font-smoothing: antialiased;
+  font-synthesis-weight: none;
+  /* NUI is an overlay. Nothing here should ever eat a click meant for the
+     game — opt individual panels back in with .lxr-hit. */
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lxr-hit {
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   BRAND MARK — LXRCore wolf
+   Canonical for every lxr-* resource. PNG only; no SVG ships in a script.
+
+   Filename is fixed: html/img/lxrcore-logo.png. Buyers and escrow tooling
+   expect that exact path, so do not rename it per-resource.
+
+     files { 'html/img/*.png' }   -- in fxmanifest.lua, or CEF 404s it
+   ========================================================================== */
+
+:root {
+  --img-lxrcore-logo: url('img/lxrcore-logo.png');
+
+  /* The tile the mark sits on. The wolf is a white line drawing, so it
+     vanishes on any pale surface — it needs a dark plate under it wherever
+     the surrounding chrome is light. */
+  --lxrcore-tile: #17171b;
+
+  /* Tile edge. Gold is the LXRCore convention from the brand README; the
+     wine below is the genatsvale-derived accent this kit is built on. They
+     are different brands, so this is a real choice — override the token,
+     do not edit the class. */
+  --lxrcore-edge: #b8862f;
+}
+
+.adm-store-banner__avatar-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  background: var(--lxrcore-tile);
+}
+
+/* Charcoal tile + edge, so the white wolf reads on a cream banner. */
+.adm-store-banner__avatar-wrap--lxrcore {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--lxrcore-edge);
+  border-radius: var(--lxr-radius);
+}
+
+.adm-store-banner__avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.adm-store-banner__avatar--lxrcore {
+  /* The mark is drawn to its own bounding box with no built-in margin, so
+     it needs breathing room or it collides with the tile edge. */
+  padding: 8px;
+}
+
+/* Session and guide HUDs carry the mark as a background rather than an
+   <img>, so it cannot be dragged, selected or picked up by a screenshot
+   tool as a separate element. */
+.lxr-session-hud .__brand,
+.lxr-guide-hud .__brand {
+  background-image: var(--img-lxrcore-logo);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Watermark treatment — the mark held back far enough to sit behind text. */
+.lxr-brand-watermark {
+  background-image: var(--img-lxrcore-logo);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.lxr ::selection {
+  background: var(--lxr-blood);
+  color: var(--lxr-bone);
+}
+
+.lxr :focus-visible {
+  outline: 1px solid var(--lxr-bone);
+  outline-offset: 3px;
+}
+
+/* ==========================================================================
+   3. TYPOGRAPHY
+   Four classes. If you are reaching for a fifth, you are inventing a voice
+   the brand does not have.
+   ========================================================================== */
+
+/* Editorial serif. Headlines and numbers at scale ONLY — never body copy,
+   never below ~22px, where its low contrast and tight leading turn to mush. */
+.lxr-cut {
+  font-family: var(--lxr-font-cut);
+  font-variation-settings: 'opsz' 88, 'SOFT' 0, 'WONK' 0;
+  font-weight: 400;
+  line-height: 0.94;
+  letter-spacing: var(--lxr-track-cut);
+}
+
+/* The same serif, italic and wonky. Used for the second half of a two-part
+   headline, at reduced opacity. One per screen at most. */
+.lxr-cut-slant {
+  font-family: var(--lxr-font-cut);
+  font-variation-settings: 'opsz' 88, 'SOFT' 40, 'WONK' 1;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 0.94;
+  letter-spacing: -0.012em;
+}
+
+/* Machine text. Labels, keybinds, counters, section headers, nav. This is
+   the most recognisable thing in the kit — wide-tracked uppercase mono is
+   what makes an unfamiliar panel read as "ours". */
+.lxr-mono {
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numbers that change in place — money, ammo, timers, weights. Tabular
+   figures stop the layout twitching every time a digit ticks. */
+.lxr-num {
+  font-family: var(--lxr-font-code);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Georgian. Mkhedruli has no uppercase — never text-transform it, never
+   track it out. Mark the element lang="ka" as well as styling it. */
+.lxr-ka {
+  font-family: var(--lxr-font-ka);
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+/* Text colour roles. */
+.lxr-t-bone { color: var(--lxr-bone); }
+.lxr-t-ash { color: var(--lxr-ash); }
+.lxr-t-smoke { color: var(--lxr-smoke); }
+.lxr-t-blood { color: var(--lxr-blood-lit); }
+.lxr-t-ok { color: var(--lxr-ok); }
+.lxr-t-warn { color: var(--lxr-warn); }
+
+/* Title sizes. */
+.lxr-title { font-size: var(--lxr-title); }
+.lxr-title-lg { font-size: var(--lxr-title-lg); }
+
+/* ==========================================================================
+   4. SURFACES
+   ========================================================================== */
+
+/* The default panel: opaque ink with a hairline. Opaque on purpose — a
+   translucent panel over a moving game frame is unreadable the moment the
+   player walks past a bright wall. */
+.lxr-panel {
+  background: var(--lxr-pit);
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+  border-radius: var(--lxr-radius);
+  box-shadow: var(--lxr-lift);
+}
+
+/* Deeper well, for a list or input sunk into a panel. */
+.lxr-well {
+  background: var(--lxr-void);
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+}
+
+/* Glass. Reserve this for a small floating control — a toggle pill, a
+   keybind hint. backdrop-filter is measured in whole frames on a mid-range
+   GPU; a full-screen glass panel will cost you FPS in a way players notice. */
+.lxr-glass {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.015);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.09);
+}
+
+/* The lit rim that makes glass read as an object rather than a smear. */
+.lxr-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.3px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.36) 0%,
+    rgba(255, 255, 255, 0.1) 22%,
+    rgba(255, 255, 255, 0) 45%,
+    rgba(255, 255, 255, 0) 58%,
+    rgba(255, 255, 255, 0.1) 80%,
+    rgba(255, 255, 255, 0.36) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* --- The wash ------------------------------------------------------------
+   The signature background. Two offset radial gradients of the accent over
+   void — the thing that makes a flat black panel read as a lit room rather
+   than a dead rectangle. Lifted verbatim from the site's WebGL stage; the
+   percentages are the original values, with the color-mix() calls resolved
+   to their exact rgba equivalents.
+
+   Put it on a full-screen layer BEHIND content, never on the panel itself. */
+.lxr-wash {
+  background-color: var(--lxr-void);
+  background-image:
+    radial-gradient(58% 48% at 50% 42%, rgba(141, 18, 38, 0.34) 0%, transparent 68%),
+    radial-gradient(42% 38% at 78% 68%, rgba(194, 28, 55, 0.18) 0%, transparent 70%);
+}
+
+/* Quieter variant, for a HUD or a menu that must not compete with the game. */
+.lxr-wash-soft {
+  background-color: var(--lxr-void);
+  background-image:
+    radial-gradient(58% 48% at 50% 42%, rgba(141, 18, 38, 0.16) 0%, transparent 68%),
+    radial-gradient(42% 38% at 78% 68%, rgba(194, 28, 55, 0.09) 0%, transparent 70%);
+}
+
+/* Readability scrim. The wash is atmosphere; body copy still needs ink under
+   it. Layer this between the wash and the content. */
+.lxr-scrim-grad {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(5, 5, 6, 0.45) 0%,
+    rgba(5, 5, 6, 0.7) 50%,
+    rgba(5, 5, 6, 0.9) 100%
+  );
+}
+
+/* Hairline dividers. */
+.lxr-rule { border-top: var(--lxr-hairline) solid var(--lxr-edge); }
+.lxr-rule-b { border-bottom: var(--lxr-hairline) solid var(--lxr-edge); }
+
+/* ==========================================================================
+   5. CONTROLS
+   ========================================================================== */
+
+/* Primary. Bone fill, void text, wine on hover. One per screen — if two
+   things are primary, neither is. */
+.lxr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lxr-s2);
+  background: var(--lxr-bone);
+  color: var(--lxr-void);
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  padding: 14px 28px;
+  border: none;
+  border-radius: var(--lxr-radius);
+  cursor: pointer;
+  transition:
+    background-color var(--lxr-slow) var(--lxr-ease),
+    color var(--lxr-slow) var(--lxr-ease);
+}
+
+.lxr-btn:hover {
+  background: var(--lxr-blood-lit);
+  color: var(--lxr-bone);
+}
+
+.lxr-btn:disabled,
+.lxr-btn[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lxr-btn:disabled:hover {
+  background: var(--lxr-bone);
+  color: var(--lxr-void);
+}
+
+/* Secondary. Hairline only. This is the default for almost every action. */
+.lxr-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lxr-s2);
+  background: transparent;
+  border: var(--lxr-hairline) solid var(--lxr-bone-26);
+  color: var(--lxr-bone);
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  padding: 13px 27px;
+  border-radius: var(--lxr-radius);
+  cursor: pointer;
+  transition:
+    border-color var(--lxr-slow) var(--lxr-ease),
+    background-color var(--lxr-slow) var(--lxr-ease);
+}
+
+.lxr-btn-ghost:hover {
+  border-color: var(--lxr-bone);
+  background: var(--lxr-bone-07);
+}
+
+/* Destructive. The only button that is wine at rest. */
+.lxr-btn-bad {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lxr-s2);
+  background: transparent;
+  border: var(--lxr-hairline) solid var(--lxr-blood-lit);
+  color: var(--lxr-blood-lit);
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  padding: 13px 27px;
+  cursor: pointer;
+  transition:
+    background-color var(--lxr-fast) var(--lxr-ease),
+    color var(--lxr-fast) var(--lxr-ease);
+}
+
+.lxr-btn-bad:hover {
+  background: var(--lxr-blood-lit);
+  color: var(--lxr-bone);
+}
+
+/* Small variant for dense toolbars. */
+.lxr-btn-sm {
+  padding: 8px 16px;
+}
+
+/* Text input. */
+.lxr-input {
+  width: 100%;
+  background: var(--lxr-void);
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+  color: var(--lxr-bone);
+  font-family: var(--lxr-font-plain);
+  font-size: var(--lxr-text-body);
+  padding: 12px 14px;
+  border-radius: var(--lxr-radius);
+  outline: none;
+  transition: border-color var(--lxr-fast) var(--lxr-ease);
+}
+
+.lxr-input::placeholder { color: var(--lxr-smoke); }
+.lxr-input:focus { border-color: var(--lxr-bone-40); }
+
+/* Chip / segmented option. Use for categories, sizes, filters. */
+.lxr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lxr-s2);
+  background: transparent;
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+  color: var(--lxr-ash);
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition:
+    border-color var(--lxr-fast) var(--lxr-ease),
+    color var(--lxr-fast) var(--lxr-ease);
+}
+
+.lxr-chip:hover {
+  border-color: var(--lxr-bone-40);
+  color: var(--lxr-bone);
+}
+
+.lxr-chip[aria-pressed='true'],
+.lxr-chip.is-on {
+  background: var(--lxr-bone);
+  border-color: var(--lxr-bone);
+  color: var(--lxr-void);
+}
+
+/* Keybind glyph. */
+.lxr-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: var(--lxr-void);
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+  color: var(--lxr-ash);
+  font-family: var(--lxr-font-code);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   THE INDEX ROW — the signature pattern of this system
+   --------------------------------------------------------------------------
+   If you take one thing from this kit, take this. It is the site's nav
+   overlay, and it is what makes an unfamiliar panel read as ours: a mono
+   index number in accent, a serif name at scale, a hairline above, and meta
+   pushed to the far right.
+
+   It replaces almost every list a RedM script needs. Reach for it before you
+   reach for a grid of cards or a table:
+
+     menus            stores, stables, crafting, job boards
+     inventories      saddlebags, satchel, wagon, stash
+     rosters          players online, gang members, employees
+     records          transactions, warrants, licences, deliveries
+     settings         any enumerable list of toggles
+
+   The rules that keep it recognisable:
+     - The index is ALWAYS mono, ALWAYS accent, ALWAYS zero-padded (01 not 1)
+     - The name is ALWAYS the serif, never the sans
+     - The hairline is on the TOP of each row, so a list reads as open-ended
+       rather than boxed in
+     - Meta is right-aligned via margin-left:auto, never a fixed column
+   ========================================================================== */
+.lxr-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lxr-s5);
+  width: 100%;
+  padding: var(--lxr-s4) 0;
+  background: transparent;
+  border: none;
+  border-top: var(--lxr-hairline) solid var(--lxr-edge);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--lxr-fast) var(--lxr-ease);
+}
+
+.lxr-row:hover .lxr-row-name { color: var(--lxr-blood-lit); }
+
+.lxr-row-index {
+  flex: none;
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  color: var(--lxr-blood-lit);
+}
+
+.lxr-row-name {
+  font-family: var(--lxr-font-cut);
+  font-variation-settings: 'opsz' 88;
+  font-size: var(--lxr-text-xl);
+  line-height: 1.05;
+  color: var(--lxr-bone);
+  transition: color var(--lxr-fast) var(--lxr-ease);
+}
+
+.lxr-row-meta {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  color: var(--lxr-smoke);
+}
+
+/* --- Index row variants --------------------------------------------------
+   Every one of these is the same row with one thing added. Do not invent a
+   new row shape; add a modifier. */
+
+/* Two-line: a Georgian name, a description, a subtitle. The stack keeps the
+   baseline of the primary name aligned with the index number. */
+.lxr-row--sub { align-items: flex-start; }
+
+.lxr-row-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.lxr-row-sub {
+  font-family: var(--lxr-font-plain);
+  font-size: var(--lxr-text-sm);
+  color: var(--lxr-ash);
+  line-height: 1.45;
+}
+
+/* Georgian secondary line. Never uppercased, never tracked. */
+.lxr-row-ka {
+  font-family: var(--lxr-font-ka);
+  font-size: var(--lxr-text-sm);
+  color: var(--lxr-smoke);
+  letter-spacing: 0;
+}
+
+/* Selected / current. The accent moves to the name; the index stays put so
+   the column of numbers never jumps. */
+.lxr-row.is-active .lxr-row-name { color: var(--lxr-blood-lit); }
+.lxr-row.is-active .lxr-row-meta { color: var(--lxr-ash); }
+
+/* Unavailable. Dimmed rather than hidden — a player needs to see that a
+   thing exists before they can want it. */
+.lxr-row.is-locked { cursor: not-allowed; }
+.lxr-row.is-locked .lxr-row-name,
+.lxr-row.is-locked .lxr-row-index { color: var(--lxr-smoke); }
+.lxr-row.is-locked:hover .lxr-row-name { color: var(--lxr-smoke); }
+
+/* Dense variant for long lists — a 40-slot satchel does not need 22px names. */
+.lxr-row--compact { padding: var(--lxr-s3) 0; }
+.lxr-row--compact .lxr-row-name { font-size: var(--lxr-text-lg); }
+
+/* Leading status dot, for rosters and anything with live state. */
+.lxr-row-lead { flex: none; display: flex; align-items: center; }
+
+/* Trailing count pill — quantity, stack size, unread. */
+.lxr-row-badge {
+  flex: none;
+  font-family: var(--lxr-font-code);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--lxr-void);
+  background: var(--lxr-bone);
+  padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lxr-row-badge.is-accent { background: var(--lxr-blood-lit); color: var(--lxr-bone); }
+
+/* Trailing price. Tabular so a column of numbers lines up. */
+.lxr-row-price {
+  flex: none;
+  font-family: var(--lxr-font-code);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--lxr-text-sm);
+  color: var(--lxr-bone);
+}
+
+/* Group heading inside a long list. */
+.lxr-row-group {
+  font-family: var(--lxr-font-code);
+  font-size: var(--lxr-text-micro);
+  letter-spacing: var(--lxr-track-mono);
+  text-transform: uppercase;
+  color: var(--lxr-smoke);
+  padding: var(--lxr-s5) 0 var(--lxr-s2);
+}
+
+/* A weight/capacity bar hung under a row, for inventories. */
+.lxr-row-bar { margin-top: var(--lxr-s2); }
+
+/* Progress / meter — stamina, hunger, job completion. */
+.lxr-meter {
+  height: 3px;
+  width: 100%;
+  background: var(--lxr-edge);
+  overflow: hidden;
+}
+
+.lxr-meter-fill {
+  height: 100%;
+  background: var(--lxr-bone);
+  transition: width var(--lxr-mid) var(--lxr-ease);
+}
+
+.lxr-meter-fill.is-warn { background: var(--lxr-warn); }
+.lxr-meter-fill.is-bad { background: var(--lxr-blood-lit); }
+.lxr-meter-fill.is-ok { background: var(--lxr-ok); }
+
+/* Status dot. */
+.lxr-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--lxr-radius-pill);
+  background: var(--lxr-smoke);
+}
+
+.lxr-dot.is-ok { background: var(--lxr-ok); }
+.lxr-dot.is-warn { background: var(--lxr-warn); }
+.lxr-dot.is-bad { background: var(--lxr-blood-lit); }
+
+/* Notification / toast. */
+.lxr-toast {
+  display: flex;
+  gap: var(--lxr-s3);
+  min-width: 280px;
+  max-width: 380px;
+  padding: var(--lxr-s4);
+  background: var(--lxr-pit);
+  border: var(--lxr-hairline) solid var(--lxr-edge);
+  border-left: 2px solid var(--lxr-bone);
+  box-shadow: var(--lxr-lift);
+}
+
+.lxr-toast.is-ok { border-left-color: var(--lxr-ok); }
+.lxr-toast.is-warn { border-left-color: var(--lxr-warn); }
+.lxr-toast.is-bad { border-left-color: var(--lxr-blood-lit); }
+
+/* ==========================================================================
+   6. MOTION
+   Four animations, matching the site. Everything respects reduced motion at
+   the foot of this file.
+   ========================================================================== */
+
+@keyframes lxr-rise {
+  from { transform: translate3d(0, 26px, 0); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes lxr-wipe {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes lxr-letter {
+  from { transform: translateY(112%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes lxr-scroll {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes lxr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.lxr-rise { animation: lxr-rise 1s var(--lxr-ease) both; }
+.lxr-wipe { animation: lxr-wipe 1.1s var(--lxr-cut) both; }
+.lxr-pulse { animation: lxr-pulse 2s ease-in-out infinite; }
+
+/* Marquee. Duplicate the child track twice inside for a seamless loop. */
+.lxr-scroller {
+  display: flex;
+  width: max-content;
+  animation: lxr-scroll var(--lxr-scroll-dur, 44s) linear infinite;
+}
+
+/* Letters rising out of a clipped box. Wrap each glyph in
+   .lxr-letter > span and stagger animation-delay in JS.
+   The padding/negative-margin pair is load-bearing: the serif's descenders
+   are taller than its 0.94 line-height, so without it every `y`, `g` and `p`
+   is sheared off at the baseline. */
+.lxr-letter {
+  display: inline-block;
+  overflow: hidden;
+  padding-bottom: 0.26em;
+  margin-bottom: -0.26em;
+  vertical-align: bottom;
+}
+
+.lxr-letter > span {
+  display: inline-block;
+  animation: lxr-letter 1s var(--lxr-ease) both;
+  will-change: transform;
+}
+
+/* Stagger helpers, so simple cases need no JS at all. */
+.lxr-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.lxr-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.lxr-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.lxr-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.lxr-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.lxr-stagger > *:nth-child(6) { animation-delay: 300ms; }
+.lxr-stagger > *:nth-child(7) { animation-delay: 360ms; }
+.lxr-stagger > *:nth-child(8) { animation-delay: 420ms; }
+
+/* ==========================================================================
+   7. LAYOUT
+   ========================================================================== */
+
+.lxr-stack { display: flex; flex-direction: column; }
+.lxr-row-flex { display: flex; align-items: center; }
+.lxr-between { display: flex; align-items: center; justify-content: space-between; }
+.lxr-wrap { flex-wrap: wrap; }
+.lxr-grow { flex: 1 1 auto; min-width: 0; }
+
+.lxr-g1 { gap: var(--lxr-s1); }
+.lxr-g2 { gap: var(--lxr-s2); }
+.lxr-g3 { gap: var(--lxr-s3); }
+.lxr-g4 { gap: var(--lxr-s4); }
+.lxr-g5 { gap: var(--lxr-s5); }
+.lxr-g6 { gap: var(--lxr-s6); }
+
+.lxr-p4 { padding: var(--lxr-s4); }
+.lxr-p5 { padding: var(--lxr-s5); }
+.lxr-p6 { padding: var(--lxr-s6); }
+
+/* Anchors. NUI panels are positioned against screen edges, not flowed. */
+.lxr-fixed { position: fixed; }
+.lxr-center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.lxr-tl { position: fixed; top: var(--lxr-s6); left: var(--lxr-s6); }
+.lxr-tr { position: fixed; top: var(--lxr-s6); right: var(--lxr-s6); }
+.lxr-bl { position: fixed; bottom: var(--lxr-s6); left: var(--lxr-s6); }
+.lxr-br { position: fixed; bottom: var(--lxr-s6); right: var(--lxr-s6); }
+
+/* Full-screen scrim behind a modal. */
+.lxr-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 6, 0.72);
+}
+
+.lxr-hidden { display: none !important; }
+
+/* Scrollbar, for lists long enough to need one. */
+.lxr ::-webkit-scrollbar { width: 6px; height: 6px; }
+.lxr ::-webkit-scrollbar-track { background: transparent; }
+.lxr ::-webkit-scrollbar-thumb { background: var(--lxr-edge); }
+.lxr ::-webkit-scrollbar-thumb:hover { background: var(--lxr-smoke); }
+
+/* ==========================================================================
+   8. ACCESSIBILITY
+   Players do set reduced motion, and a HUD that ignores it is a HUD that
+   makes some of them motion sick.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .lxr *,
+  .lxr *::before,
+  .lxr *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ==========================================================================
+   CONTRAST — measured, not assumed. Ratios against --lxr-void (#050506).
+
+     bone      #f4f2ee   18.2:1   passes AA + AAA, any size
+     ash       #9b9aa0    7.3:1   passes AA + AAA, any size
+     blood-lit #c21c37    3.4:1   LARGE TEXT ONLY (>=24px, or >=19px bold)
+     smoke     #58575e    2.9:1   FAILS AA at every size
+     blood     #8d1226    2.2:1   FAILS — a fill colour, never a text colour
+
+   Two rules that follow from those numbers, and they are not optional:
+
+     1. --lxr-smoke is for decoration, disabled states and text a player
+        never has to read. The moment it carries meaning, use --lxr-ash.
+     2. --lxr-blood-lit is legible as a heading, an icon or a border. It is
+        not legible as body copy. For a wine-coloured warning sentence, put
+        the wine on the border and the text in bone.
+
+   bone on blood-lit (hover fill) is 5.3:1 — safe.
+   ========================================================================== */
