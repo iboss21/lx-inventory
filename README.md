@@ -1,0 +1,2 @@
+# lx-inventory
+fivem qbcore
